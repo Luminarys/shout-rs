@@ -1,0 +1,9 @@
+[package]
+name = "shout"
+version = "0.1.0"
+authors = ["Luminarys <postmaster@gensok.io>"]
+
+[dependencies]
+
+[dependencies.shout-sys]
+path = "shout-sys"

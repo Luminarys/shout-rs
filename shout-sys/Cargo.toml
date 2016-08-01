@@ -1,0 +1,8 @@
+[package]
+name = "shout-sys"
+version = "0.1.0"
+authors = ["Luminarys <postmaster@gensok.io>"]
+build = "build.rs"
+
+[dependencies]
+libc = "0.2"
