@@ -413,22 +413,16 @@ pub struct ShoutConn {
 
 impl ShoutConn {
     /// Sends data to the server, parsing it for format specific timing info.
-    pub fn send(&self, data: Vec<u8>) -> Result<i32, ShoutConnError> {
+    pub fn send(&self, data: Vec<u8>) -> i32 {
         let len = data.len();
-        match CString::new(data) {
-            Ok(s) => unsafe { Ok(sys::shout_send(self.shout, s.as_ptr() as *const u8, len)) },
-            Err(e) => Err(ShoutConnError::NulError(e)),
-        }
+        unsafe { sys::shout_send(self.shout, data.as_ptr() as *const u8, len) }
     }
 
     /// Sends unparsed data to the server. Do not use this unless you know what you're doing.
     /// Returns the number of bytes writter, or < 0 on error.
-    pub fn send_raw(&self, data: Vec<u8>) -> Result<isize, ShoutConnError> {
+    pub fn send_raw(&self, data: Vec<u8>) -> isize {
         let len = data.len();
-        match CString::new(data) {
-            Ok(s) => unsafe { Ok(sys::shout_send_raw(self.shout, s.as_ptr() as *const u8, len)) },
-            Err(e) => Err(ShoutConnError::NulError(e)),
-        }
+        unsafe { sys::shout_send_raw(self.shout, data.as_ptr() as *const u8, len) }
     }
 
     /// Returns the number of bytes on the write queue. Only makes sense in nonblocking mode.
