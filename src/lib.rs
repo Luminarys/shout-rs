@@ -2,20 +2,35 @@ extern crate shout_sys as sys;
 
 use std::ffi::{CString, NulError};
 
+/// Type representing the return of a call to a libshout function.
+/// The Success value should never be returned as an error by this library.
 pub enum ShoutErr {
+    /// No error
     Success = 0,
+    /// Nonsensical arguments
     Insane = -1,
+    /// Couldn't connect
     NoConnect = -2,
+    /// Login failed
     NoLogin = -3,
+    /// Socket error
     Socket = -4,
+    /// Out of memory
     Malloc = -5,
     Metadata = -6,
+    /// Cannot set parameter while connected
     Connected = -7,
+    /// Not connected
     Unconnected = -8,
+    /// This libshout version doesn't support the requested operation
     Unsupported = -9,
+    /// The socket is busy
     Busy = -10,
+    /// TLS requested but not supported by the peer
     NoTLS = -11,
+    /// TLS connection cannot be established due to bad certificate
     TLSBadCert = -12,
+    /// Retry last operation
     Retry = -13,
 }
 
@@ -41,21 +56,33 @@ impl ShoutErr {
     }
 }
 
+/// Type representing a TLS mode to connect to a host with
 pub enum ShoutTLS {
+    /// Do not use TLS at all
     Disabled = 0,
+    /// Autodetect which TLS mode to use if any
     Auto = 1,
+    /// Like Auto, but does not allow plain connections
     AutoNoPlain = 2,
+    /// USE TLS for transport layer like HTTPS(RFC2818) does
     RFC2818 = 11,
+    /// USE TLS via HTTP Upgrade:-header (RFC2817)
     RFC2817 = 12,
 }
 
+/// Type representing the format of data to be streamed to the host is
 pub enum ShoutFormat {
+    /// application/ogg
     Ogg = 0,
+    /// audio/mpeg
     MP3 = 1,
+    /// video/webm
     Webm = 2,
+    /// audio/webm audio only
     WebmAudio = 3,
 }
 
+/// Type representing the protocol to use for libshout
 pub enum ShoutProtocol {
     HTTP = 0,
     XAudioCast = 1,
@@ -71,6 +98,7 @@ pub static SHOUT_META_IRC: &'static str = "irc";
 pub static SHOUT_META_AIM: &'static str = "aim";
 pub static SHOUT_META_ICQ: &'static str = "icq";
 
+/// Type representing a meta value used in setting up the connection with the host.
 pub enum ShoutMeta {
     Name(String),
     Url(String),
@@ -86,6 +114,7 @@ pub static SHOUT_AI_SAMPLERATE: &'static str = "samplerate";
 pub static SHOUT_AI_CHANNELS: &'static str = "channels";
 pub static SHOUT_AI_QUALITY: &'static str = "quality";
 
+/// Type representing information about the audio data to be sent to the host
 pub enum ShoutAudioInfo {
     BitRate(String),
     SampleRate(String),
@@ -93,6 +122,8 @@ pub enum ShoutAudioInfo {
     Quality(String),
 }
 
+/// Type representing an error resulting from either libshout, or processing data to be sent to
+/// libshout
 pub enum ShoutConnError {
     ShoutError(ShoutErr),
     NulError(NulError),
@@ -109,6 +140,8 @@ macro_rules! shout_err {
     );
 }
 
+/// A shout connection builder. All desired values should be set in this before it is built into a
+/// `ShoutConn`. All validation of parameters and FFI calls happen on build.
 #[derive(Default)]
 pub struct ShoutConnBuilder {
     host: Option<String>,
@@ -339,6 +372,7 @@ default_build!(ShoutConnBuilder,
                (protocol, ShoutProtocol),
                (nonblocking, u32));
 
+/// Struct representing a metadata dict to be used by the shout connection
 pub struct ShoutMetadata {
     metadata: *mut sys::ShoutMetadata,
 }
@@ -348,6 +382,7 @@ impl ShoutMetadata {
         unsafe { ShoutMetadata { metadata: sys::shout_metadata_new() } }
     }
 
+    /// Adds a parameter into the metadata structure.
     pub fn add(&mut self, name: String, value: String) -> Result<(), ShoutConnError> {
         match (CString::new(name), CString::new(value)) {
             (Ok(n), Ok(v)) => {
@@ -375,6 +410,7 @@ pub struct ShoutConn {
 }
 
 impl ShoutConn {
+    /// Sends data to the server, parsing it for format specific timing info.
     pub fn send(&self, data: Vec<u8>) -> Result<i32, ShoutConnError> {
         let len = data.len();
         match CString::new(data) {
@@ -383,6 +419,8 @@ impl ShoutConn {
         }
     }
 
+    /// Sends unparsed data to the server. Do not use this unless you know what you're doing.
+    /// Returns the number of bytes writter, or < 0 on error.
     pub fn send_raw(&self, data: Vec<u8>) -> Result<isize, ShoutConnError> {
         let len = data.len();
         match CString::new(data) {
@@ -391,18 +429,22 @@ impl ShoutConn {
         }
     }
 
+    /// Returns the number of bytes on the write queue. Only makes sense in nonblocking mode.
     pub fn queue_len(&self) -> isize {
         unsafe { sys::shout_queuelen(self.shout) }
     }
 
+    /// Sleeps the thread until the server requires more data
     pub fn sync(&self) {
         unsafe { sys::shout_sync(self.shout) }
     }
 
+    /// Returns the amount of time the caller should wait before sending more data
     pub fn delay(&self) -> i32 {
         unsafe { sys::shout_delay(self.shout) }
     }
 
+    /// Sets metadata for the host
     pub fn set_metadata(&self, metadata: ShoutMetadata) -> Result<(), ShoutConnError> {
         unsafe {
             shout_err!(sys::shout_set_metadata(self.shout, metadata.metadata));
