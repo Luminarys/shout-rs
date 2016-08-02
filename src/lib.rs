@@ -4,6 +4,7 @@ use std::ffi::{CString, NulError};
 
 /// Type representing the return of a call to a libshout function.
 /// The Success value should never be returned as an error by this library.
+#[derive(Debug)]
 pub enum ShoutErr {
     /// No error
     Success = 0,
@@ -124,6 +125,7 @@ pub enum ShoutAudioInfo {
 
 /// Type representing an error resulting from either libshout, or processing data to be sent to
 /// libshout
+#[derive(Debug)]
 pub enum ShoutConnError {
     ShoutError(ShoutErr),
     NulError(NulError),

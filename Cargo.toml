@@ -3,7 +3,14 @@ name = "shout"
 version = "0.1.0"
 authors = ["Luminarys <postmaster@gensok.io>"]
 
+description = "Higher level libshout bindings in Rust"
+repository = "https://github.com/luminarys/shout-rs"
+readme = "README.md"
+keywords = [ "shout", "libshout", "icecast", "shoutcast" ]
+license = "ISC"
+
 [dependencies]
 
 [dependencies.shout-sys]
 path = "shout-sys"
+version = "0.1.0"
