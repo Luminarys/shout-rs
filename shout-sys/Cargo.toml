@@ -3,5 +3,12 @@ name = "shout-sys"
 version = "0.1.0"
 authors = ["Luminarys <postmaster@gensok.io>"]
 
+repository = "https://github.com/luminarys/shout-rs"
+description = "Low level FFI bindings to libshout"
+keywords = [ "shout", "libshout", "icecast", "shoutcast" ]
+license = "ISC"
+
+build = "build.rs"
+
 [dependencies]
 libc = "0.2"
