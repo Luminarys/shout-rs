@@ -1,6 +1,6 @@
 [package]
 name = "shout-sys"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Luminarys <postmaster@gensok.io>"]
 
 repository = "https://github.com/luminarys/shout-rs"

@@ -1,6 +1,6 @@
 [package]
 name = "shout"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Luminarys <postmaster@gensok.io>"]
 
 description = "Higher level libshout bindings in Rust"
@@ -13,4 +13,4 @@ license = "ISC"
 
 [dependencies.shout-sys]
 path = "shout-sys"
-version = "0.1.0"
+version = "0.1.1"
