@@ -74,16 +74,17 @@ extern "C" {
     pub fn shout_open(shout: *mut Shout) -> c_int;
     pub fn shout_close(shout: *mut Shout) -> c_int;
 
-    pub fn shout_send(shout: *mut Shout, data: *const c_uchar, len: size_t) -> ssize_t;
+    pub fn shout_send(shout: *mut Shout, data: *const c_uchar, len: size_t) -> c_int;
     pub fn shout_send_raw(shout: *mut Shout, data: *const c_uchar, len: size_t) -> ssize_t;
 
-    pub fn shout_queue_len(shout: *mut Shout) -> ssize_t;
+    pub fn shout_queuelen(shout: *mut Shout) -> ssize_t;
 
     pub fn shout_sync(shout: *mut Shout);
 
     pub fn shout_delay(shout: *mut Shout) -> c_int;
 
-    pub fn shout_set_metadata(shout: *mut Shout) -> c_int;
+    pub fn shout_set_metadata(shout: *mut Shout, metadata: *mut ShoutMetadata) -> c_int;
     pub fn shout_metadata_new() -> *mut ShoutMetadata;
+    pub fn shout_metadata_free(metadata: *mut ShoutMetadata);
     pub fn shout_metadata_add(metadata: *mut ShoutMetadata, name: *const c_char, value: *const c_char) -> c_int;
 }

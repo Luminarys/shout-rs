@@ -19,23 +19,25 @@ pub enum ShoutErr {
     Retry = -13,
 }
 
-fn int_to_shout_err(int: i32) -> ShoutErr {
-    match int {
-        0 => ShoutErr::Success,
-        -1 => ShoutErr::Insane,
-        -2 => ShoutErr::NoConnect,
-        -3 => ShoutErr::NoLogin,
-        -4 => ShoutErr::Socket,
-        -5 => ShoutErr::Malloc,
-        -6 => ShoutErr::Metadata,
-        -7 => ShoutErr::Connected,
-        -8 => ShoutErr::Unconnected,
-        -9 => ShoutErr::Unsupported,
-        -10 => ShoutErr::Busy,
-        -11 => ShoutErr::NoTLS,
-        -12 => ShoutErr::TLSBadCert,
-        -13 => ShoutErr::Retry,
-        _ => unreachable!(),
+impl ShoutErr {
+    fn new(i: i32) -> ShoutErr {
+        match i {
+            0 => ShoutErr::Success,
+            -1 => ShoutErr::Insane,
+            -2 => ShoutErr::NoConnect,
+            -3 => ShoutErr::NoLogin,
+            -4 => ShoutErr::Socket,
+            -5 => ShoutErr::Malloc,
+            -6 => ShoutErr::Metadata,
+            -7 => ShoutErr::Connected,
+            -8 => ShoutErr::Unconnected,
+            -9 => ShoutErr::Unsupported,
+            -10 => ShoutErr::Busy,
+            -11 => ShoutErr::NoTLS,
+            -12 => ShoutErr::TLSBadCert,
+            -13 => ShoutErr::Retry,
+            _ => unreachable!(),
+        }
     }
 }
 
@@ -91,9 +93,20 @@ pub enum ShoutAudioInfo {
     Quality(String),
 }
 
-pub enum ShoutConnBuildError {
+pub enum ShoutConnError {
     ShoutError(ShoutErr),
     NulError(NulError),
+}
+
+macro_rules! shout_err {
+    ($func:expr) => (
+        {
+            let i = $func;
+            if i != 0 {
+                return Err(ShoutConnError::ShoutError(ShoutErr::new(i)));
+            }
+        }
+    );
 }
 
 #[derive(Default)]
@@ -133,18 +146,7 @@ impl ShoutConnBuilder {
         self
     }
 
-    pub fn build(self) -> Result<ShoutConn, ShoutConnBuildError> {
-        macro_rules! shout_err {
-            ($func:expr) => (
-                {
-                    let e = $func;
-                    if e != 0 {
-                        return Err(ShoutConnBuildError::ShoutError(int_to_shout_err(e)));
-                    }
-                }
-            );
-        }
-
+    pub fn build(self) -> Result<ShoutConn, ShoutConnError> {
         macro_rules! shout_set_string {
             ($field:ident, $shout:ident, $func:path) => (
                 {
@@ -154,7 +156,7 @@ impl ShoutConnBuilder {
                                 shout_err!($func($shout, cstr.as_ptr()));
                             }
                             Err(n) => {
-                                return Err(ShoutConnBuildError::NulError(n));
+                                return Err(ShoutConnError::NulError(n));
                             }
                         }
                     }
@@ -170,7 +172,7 @@ impl ShoutConnBuilder {
                             shout_err!($func($shout, $val.as_ptr() as *const i8,cstr.as_ptr()));
                         }
                         Err(n) => {
-                            return Err(ShoutConnBuildError::NulError(n));
+                            return Err(ShoutConnError::NulError(n));
                         }
                     }
                 }
@@ -299,11 +301,10 @@ impl ShoutConnBuilder {
                     }
                 }
             }
-            
+
             shout_err!(sys::shout_open(shout));
             Ok(ShoutConn { shout: shout })
         }
-
     }
 }
 
@@ -319,7 +320,6 @@ macro_rules! default_build {
         }
     );
 }
-
 
 default_build!(ShoutConnBuilder,
                (host, String),
@@ -339,12 +339,76 @@ default_build!(ShoutConnBuilder,
                (protocol, ShoutProtocol),
                (nonblocking, u32));
 
+pub struct ShoutMetadata {
+    metadata: *mut sys::ShoutMetadata,
+}
+
+impl ShoutMetadata {
+    pub fn new() -> ShoutMetadata {
+        unsafe { ShoutMetadata { metadata: sys::shout_metadata_new() } }
+    }
+
+    pub fn add(&mut self, name: String, value: String) -> Result<(), ShoutConnError> {
+        match (CString::new(name), CString::new(value)) {
+            (Ok(n), Ok(v)) => {
+                unsafe {
+                    shout_err!(sys::shout_metadata_add(self.metadata, n.as_ptr(), v.as_ptr()));
+                }
+                Ok(())
+            }
+            (Err(e), _) => Err(ShoutConnError::NulError(e)),
+            (_, Err(e)) => Err(ShoutConnError::NulError(e)),
+        }
+    }
+}
+
+impl Drop for ShoutMetadata {
+    fn drop(&mut self) {
+        unsafe {
+            sys::shout_metadata_free(self.metadata);
+        }
+    }
+}
+
 pub struct ShoutConn {
     shout: *mut sys::Shout,
 }
 
 impl ShoutConn {
-    // TODO
+    pub fn send(&self, data: Vec<u8>) -> Result<i32, ShoutConnError> {
+        let len = data.len();
+        match CString::new(data) {
+            Ok(s) => unsafe { Ok(sys::shout_send(self.shout, s.as_ptr() as *const u8, len)) },
+            Err(e) => Err(ShoutConnError::NulError(e)),
+        }
+    }
+
+    pub fn send_raw(&self, data: Vec<u8>) -> Result<isize, ShoutConnError> {
+        let len = data.len();
+        match CString::new(data) {
+            Ok(s) => unsafe { Ok(sys::shout_send_raw(self.shout, s.as_ptr() as *const u8, len)) },
+            Err(e) => Err(ShoutConnError::NulError(e)),
+        }
+    }
+
+    pub fn queue_len(&self) -> isize {
+        unsafe { sys::shout_queuelen(self.shout) }
+    }
+
+    pub fn sync(&self) {
+        unsafe { sys::shout_sync(self.shout) }
+    }
+
+    pub fn delay(&self) -> i32 {
+        unsafe { sys::shout_delay(self.shout) }
+    }
+
+    pub fn set_metadata(&self, metadata: ShoutMetadata) -> Result<(), ShoutConnError> {
+        unsafe {
+            shout_err!(sys::shout_set_metadata(self.shout, metadata.metadata));
+            Ok(())
+        }
+    }
 }
 
 impl Drop for ShoutConn {
