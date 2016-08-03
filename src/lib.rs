@@ -2,6 +2,9 @@ extern crate shout_sys as sys;
 
 use std::ffi::{CString, NulError};
 
+use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
+static GLOBAL_INSTANCE_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
+
 /// Type representing the return of a call to a libshout function.
 /// The Success value should never be returned as an error by this library.
 #[derive(Debug)]
@@ -215,7 +218,10 @@ impl ShoutConnBuilder {
         }
 
         unsafe {
-            sys::shout_init();
+            let instances = GLOBAL_INSTANCE_COUNT.fetch_add(1, Ordering::SeqCst);
+            if instances == 0 {
+                sys::shout_init();
+            }
             let shout = sys::shout_new();
 
             shout_set_string!(host, shout, sys::shout_set_host);
@@ -454,7 +460,10 @@ impl Drop for ShoutConn {
         unsafe {
             sys::shout_close(self.shout);
             sys::shout_free(self.shout);
-            sys::shout_shutdown();
+            let instances = GLOBAL_INSTANCE_COUNT.fetch_sub(1, Ordering::SeqCst);
+            if instances == 1 {
+                sys::shout_shutdown();
+            }
         }
     }
 }
