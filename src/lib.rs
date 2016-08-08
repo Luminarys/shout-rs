@@ -7,7 +7,7 @@ static GLOBAL_INSTANCE_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
 
 /// Type representing the return of a call to a libshout function.
 /// The Success value should never be returned as an error by this library.
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum ShoutErr {
     /// No error
     Success = 0,
@@ -61,6 +61,7 @@ impl ShoutErr {
 }
 
 /// Type representing a TLS mode to connect to a host with
+#[derive(Copy, Clone, Debug)]
 pub enum ShoutTLS {
     /// Do not use TLS at all
     Disabled = 0,
@@ -75,6 +76,7 @@ pub enum ShoutTLS {
 }
 
 /// Type representing the format of data to be streamed to the host is
+#[derive(Copy, Clone, Debug)]
 pub enum ShoutFormat {
     /// application/ogg
     Ogg = 0,
@@ -87,6 +89,7 @@ pub enum ShoutFormat {
 }
 
 /// Type representing the protocol to use for libshout
+#[derive(Copy, Clone, Debug)]
 pub enum ShoutProtocol {
     HTTP = 0,
     XAudioCast = 1,
@@ -103,6 +106,7 @@ pub static SHOUT_META_AIM: &'static str = "aim";
 pub static SHOUT_META_ICQ: &'static str = "icq";
 
 /// Type representing a meta value used in setting up the connection with the host.
+#[derive(Clone, Debug)]
 pub enum ShoutMeta {
     Name(String),
     Url(String),
@@ -119,6 +123,7 @@ pub static SHOUT_AI_CHANNELS: &'static str = "channels";
 pub static SHOUT_AI_QUALITY: &'static str = "quality";
 
 /// Type representing information about the audio data to be sent to the host
+#[derive(Clone, Debug)]
 pub enum ShoutAudioInfo {
     BitRate(String),
     SampleRate(String),
