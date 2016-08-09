@@ -473,6 +473,8 @@ impl Drop for ShoutConn {
     }
 }
 
+unsafe impl Send for ShoutConn { }
+
 #[cfg(test)]
 mod tests {
     use super::sys;
