@@ -58,6 +58,13 @@ impl ShoutErr {
             _ => unreachable!(),
         }
     }
+
+    pub fn success(&self) -> bool {
+        match *self {
+            ShoutErr::Success => true,
+            _ => false,
+        }
+    }
 }
 
 /// Type representing a TLS mode to connect to a host with
@@ -139,7 +146,7 @@ pub enum ShoutConnError {
     NulError(NulError),
 }
 
-macro_rules! shout_err {
+macro_rules! shout_conn_err {
     ($func:expr) => (
         {
             let i = $func;
@@ -196,7 +203,7 @@ impl ShoutConnBuilder {
                     if let Some(val) = self.$field {
                         match CString::new(val) {
                             Ok(cstr) => {
-                                shout_err!($func($shout, cstr.as_ptr()));
+                                shout_conn_err!($func($shout, cstr.as_ptr()));
                             }
                             Err(n) => {
                                 return Err(ShoutConnError::NulError(n));
@@ -212,7 +219,7 @@ impl ShoutConnBuilder {
                 {
                     match CString::new($field) {
                         Ok(cstr) => {
-                            shout_err!($func($shout, $val.as_ptr() as *const i8,cstr.as_ptr()));
+                            shout_conn_err!($func($shout, $val.as_ptr() as *const i8,cstr.as_ptr()));
                         }
                         Err(n) => {
                             return Err(ShoutConnError::NulError(n));
@@ -232,26 +239,26 @@ impl ShoutConnBuilder {
             shout_set_string!(host, shout, sys::shout_set_host);
 
             if let Some(port) = self.port {
-                shout_err!(sys::shout_set_port(shout, port));
+                shout_conn_err!(sys::shout_set_port(shout, port));
             }
 
             shout_set_string!(agent, shout, sys::shout_set_agent);
 
             match self.tls {
                 Some(ShoutTLS::Disabled) => {
-                    shout_err!(sys::shout_set_tls(shout, 0));
+                    shout_conn_err!(sys::shout_set_tls(shout, 0));
                 }
                 Some(ShoutTLS::Auto) => {
-                    shout_err!(sys::shout_set_tls(shout, 1));
+                    shout_conn_err!(sys::shout_set_tls(shout, 1));
                 }
                 Some(ShoutTLS::AutoNoPlain) => {
-                    shout_err!(sys::shout_set_tls(shout, 2));
+                    shout_conn_err!(sys::shout_set_tls(shout, 2));
                 }
                 Some(ShoutTLS::RFC2818) => {
-                    shout_err!(sys::shout_set_tls(shout, 11));
+                    shout_conn_err!(sys::shout_set_tls(shout, 11));
                 }
                 Some(ShoutTLS::RFC2817) => {
-                    shout_err!(sys::shout_set_tls(shout, 12));
+                    shout_conn_err!(sys::shout_set_tls(shout, 12));
                 }
                 None => {}
             }
@@ -266,43 +273,43 @@ impl ShoutConnBuilder {
             shout_set_string!(dumpfile, shout, sys::shout_set_dumpfile);
 
             if let Some(public) = self.public {
-                shout_err!(sys::shout_set_public(shout, public));
+                shout_conn_err!(sys::shout_set_public(shout, public));
             }
 
             match self.format {
                 Some(ShoutFormat::Ogg) => {
-                    shout_err!(sys::shout_set_format(shout, 0));
+                    shout_conn_err!(sys::shout_set_format(shout, 0));
                 }
                 Some(ShoutFormat::MP3) => {
-                    shout_err!(sys::shout_set_format(shout, 1));
+                    shout_conn_err!(sys::shout_set_format(shout, 1));
                 }
                 Some(ShoutFormat::Webm) => {
-                    shout_err!(sys::shout_set_format(shout, 2));
+                    shout_conn_err!(sys::shout_set_format(shout, 2));
                 }
                 Some(ShoutFormat::WebmAudio) => {
-                    shout_err!(sys::shout_set_format(shout, 3));
+                    shout_conn_err!(sys::shout_set_format(shout, 3));
                 }
                 None => {}
             }
 
             match self.protocol {
                 Some(ShoutProtocol::HTTP) => {
-                    shout_err!(sys::shout_set_protocol(shout, 0));
+                    shout_conn_err!(sys::shout_set_protocol(shout, 0));
                 }
                 Some(ShoutProtocol::XAudioCast) => {
-                    shout_err!(sys::shout_set_protocol(shout, 1));
+                    shout_conn_err!(sys::shout_set_protocol(shout, 1));
                 }
                 Some(ShoutProtocol::Icy) => {
-                    shout_err!(sys::shout_set_protocol(shout, 2));
+                    shout_conn_err!(sys::shout_set_protocol(shout, 2));
                 }
                 Some(ShoutProtocol::RoarAudio) => {
-                    shout_err!(sys::shout_set_protocol(shout, 3));
+                    shout_conn_err!(sys::shout_set_protocol(shout, 3));
                 }
                 None => {}
             }
 
             if let Some(nonblocking) = self.nonblocking {
-                shout_err!(sys::shout_set_nonblocking(shout, nonblocking));
+                shout_conn_err!(sys::shout_set_nonblocking(shout, nonblocking));
             }
 
             for ai in self.audio_info {
@@ -348,7 +355,7 @@ impl ShoutConnBuilder {
                 }
             }
 
-            shout_err!(sys::shout_open(shout));
+            shout_conn_err!(sys::shout_open(shout));
             Ok(ShoutConn { shout: shout })
         }
     }
@@ -400,7 +407,7 @@ impl ShoutMetadata {
         match (CString::new(name), CString::new(value)) {
             (Ok(n), Ok(v)) => {
                 unsafe {
-                    shout_err!(sys::shout_metadata_add(self.metadata, n.as_ptr(), v.as_ptr()));
+                    shout_conn_err!(sys::shout_metadata_add(self.metadata, n.as_ptr(), v.as_ptr()));
                 }
                 Ok(())
             }
@@ -423,10 +430,22 @@ pub struct ShoutConn {
 }
 
 impl ShoutConn {
+    pub fn reconnect(&self) -> Result<(), ShoutConnError> {
+        unsafe { 
+            sys::shout_close(self.shout);
+            shout_conn_err!(sys::shout_open(self.shout));
+        }
+        return Ok(());
+    }
     /// Sends data to the server, parsing it for format specific timing info.
-    pub fn send(&self, data: Vec<u8>) -> i32 {
+    pub fn send(&self, data: Vec<u8>) -> Result<(), ShoutErr> {
         let len = data.len();
-        unsafe { sys::shout_send(self.shout, data.as_ptr() as *const u8, len) }
+        let res = unsafe { sys::shout_send(self.shout, data.as_ptr() as *const u8, len) };
+        if res != 0 {
+            return Err(ShoutErr::new(res));
+        } else {
+            return Ok(())
+        }
     }
 
     /// Sends unparsed data to the server. Do not use this unless you know what you're doing.
@@ -454,7 +473,7 @@ impl ShoutConn {
     /// Sets metadata for the host
     pub fn set_metadata(&self, metadata: ShoutMetadata) -> Result<(), ShoutConnError> {
         unsafe {
-            shout_err!(sys::shout_set_metadata(self.shout, metadata.metadata));
+            shout_conn_err!(sys::shout_set_metadata(self.shout, metadata.metadata));
             Ok(())
         }
     }

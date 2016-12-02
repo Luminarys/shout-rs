@@ -1,6 +1,6 @@
 [package]
 name = "shout"
-version = "0.1.5"
+version = "0.1.6"
 authors = ["Luminarys <postmaster@gensok.io>"]
 
 description = "Higher level libshout bindings in Rust"
