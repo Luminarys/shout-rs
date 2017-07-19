@@ -20,11 +20,11 @@ fn main() {
     let mut pos = 0;
     loop {
         if pos + step < buffer.len() {
-            conn.send(buffer[pos..(pos+step)].to_vec());
+            conn.send(&buffer[pos..(pos+step)].to_vec()).unwrap();
             pos += step;
             conn.sync();
         } else {
-            conn.send(buffer[pos..(pos+(buffer.len() - pos))].to_vec());
+            conn.send(&buffer[pos..(pos+(buffer.len() - pos))].to_vec()).unwrap();
             println!("Finished!");
             break;
         }
