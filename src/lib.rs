@@ -425,6 +425,7 @@ pub struct ShoutConn {
 }
 
 impl ShoutConn {
+    /// Attempts to reconnect to the connection
     pub fn reconnect(&self) -> Result<(), ShoutConnError> {
         unsafe {
             sys::shout_close(self.shout);
@@ -432,22 +433,28 @@ impl ShoutConn {
         }
         return Ok(());
     }
+
     /// Sends data to the server, parsing it for format specific timing info.
-    pub fn send(&self, data: Vec<u8>) -> Result<(), ShoutErr> {
+    pub fn send(&self, data: &[u8]) -> Result<(), ShoutErr> {
         let len = data.len();
         let res = unsafe { sys::shout_send(self.shout, data.as_ptr() as *const u8, len) };
-        if res != 0 {
-            return Err(ShoutErr::new(res));
+        if res == 0 {
+            Ok(())
         } else {
-            return Ok(())
+            Err(ShoutErr::new(res))
         }
     }
 
     /// Sends unparsed data to the server. Do not use this unless you know what you're doing.
     /// Returns the number of bytes writter, or < 0 on error.
-    pub fn send_raw(&self, data: Vec<u8>) -> isize {
+    pub fn send_raw(&self, data: &[u8]) -> Result<usize, ShoutErr> {
         let len = data.len();
-        unsafe { sys::shout_send_raw(self.shout, data.as_ptr() as *const u8, len) }
+        let res = unsafe { sys::shout_send_raw(self.shout, data.as_ptr() as *const u8, len) };
+        if res >= 0 {
+            Ok(res as usize)
+        } else {
+            Err(ShoutErr::new(res as i32))
+        }
     }
 
     /// Returns the number of bytes on the write queue. Only makes sense in nonblocking mode.
