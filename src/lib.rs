@@ -217,14 +217,9 @@ impl ShoutConnBuilder {
         macro_rules! shout_set_kv {
             ($field:ident, $val:ident, $shout:ident, $func:path) => (
                 {
-                    match CString::new($field) {
-                        Ok(cstr) => {
-                            shout_conn_err!($func($shout, $val.as_ptr() as *const i8,cstr.as_ptr()));
-                        }
-                        Err(n) => {
-                            return Err(ShoutConnError::NulError(n));
-                        }
-                    }
+                    let k = CString::new($field).unwrap();
+                    let v = CString::new($val).unwrap();
+                    shout_conn_err!($func($shout, k.as_ptr(), v.as_ptr()))
                 }
             );
         }
@@ -315,16 +310,16 @@ impl ShoutConnBuilder {
             for ai in self.audio_info {
                 match ai {
                     ShoutAudioInfo::BitRate(val) => {
-                        shout_set_kv!(val, SHOUT_AI_BITRATE, shout, sys::shout_set_audio_info);
+                        shout_set_kv!(SHOUT_AI_BITRATE, val, shout, sys::shout_set_audio_info);
                     }
                     ShoutAudioInfo::SampleRate(val) => {
-                        shout_set_kv!(val, SHOUT_AI_SAMPLERATE, shout, sys::shout_set_audio_info);
+                        shout_set_kv!(SHOUT_AI_SAMPLERATE, val, shout, sys::shout_set_audio_info);
                     }
                     ShoutAudioInfo::Channels(val) => {
-                        shout_set_kv!(val, SHOUT_AI_CHANNELS, shout, sys::shout_set_audio_info);
+                        shout_set_kv!(SHOUT_AI_CHANNELS, val, shout, sys::shout_set_audio_info);
                     }
                     ShoutAudioInfo::Quality(val) => {
-                        shout_set_kv!(val, SHOUT_AI_QUALITY, shout, sys::shout_set_audio_info);
+                        shout_set_kv!(SHOUT_AI_QUALITY, val, shout, sys::shout_set_audio_info);
                     }
                 }
             }
@@ -332,25 +327,25 @@ impl ShoutConnBuilder {
             for meta in self.meta {
                 match meta {
                     ShoutMeta::Name(val) => {
-                        shout_set_kv!(val, SHOUT_META_NAME, shout, sys::shout_set_meta);
+                        shout_set_kv!(SHOUT_META_NAME, val, shout, sys::shout_set_meta);
                     }
                     ShoutMeta::Url(val) => {
-                        shout_set_kv!(val, SHOUT_META_URL, shout, sys::shout_set_meta);
+                        shout_set_kv!(SHOUT_META_URL, val, shout, sys::shout_set_meta);
                     }
                     ShoutMeta::Genre(val) => {
-                        shout_set_kv!(val, SHOUT_META_GENRE, shout, sys::shout_set_meta);
+                        shout_set_kv!(SHOUT_META_GENRE, val, shout, sys::shout_set_meta);
                     }
                     ShoutMeta::Description(val) => {
-                        shout_set_kv!(val, SHOUT_META_DESCRIPTION, shout, sys::shout_set_meta);
+                        shout_set_kv!(SHOUT_META_DESCRIPTION, val, shout, sys::shout_set_meta);
                     }
                     ShoutMeta::IRC(val) => {
-                        shout_set_kv!(val, SHOUT_META_IRC, shout, sys::shout_set_meta);
+                        shout_set_kv!(SHOUT_META_IRC, val, shout, sys::shout_set_meta);
                     }
                     ShoutMeta::AIM(val) => {
-                        shout_set_kv!(val, SHOUT_META_AIM, shout, sys::shout_set_meta);
+                        shout_set_kv!(SHOUT_META_AIM, val, shout, sys::shout_set_meta);
                     }
                     ShoutMeta::ICQ(val) => {
-                        shout_set_kv!(val, SHOUT_META_ICQ, shout, sys::shout_set_meta);
+                        shout_set_kv!(SHOUT_META_ICQ, val, shout, sys::shout_set_meta);
                     }
                 }
             }
@@ -431,7 +426,7 @@ pub struct ShoutConn {
 
 impl ShoutConn {
     pub fn reconnect(&self) -> Result<(), ShoutConnError> {
-        unsafe { 
+        unsafe {
             sys::shout_close(self.shout);
             shout_conn_err!(sys::shout_open(self.shout));
         }
