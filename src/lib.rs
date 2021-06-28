@@ -363,7 +363,6 @@ impl ShoutConnBuilder {
             }
 
             if let Some(format) = self.format {
-                //shout_conn_err!(sys::shout_set_format(shout, format as u32));
                 #[allow(deprecated)]
                 if format == ShoutFormat::WebmAudio {
                     shout_conn_err!(sys::shout_set_content_format(shout, ShoutFormat::Webm as u32, ShoutUsage::Audio as u32, std::ptr::null()));
