@@ -2,12 +2,12 @@ extern crate shout_sys as sys;
 
 use std::ffi::{CString, NulError};
 
-use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
-static GLOBAL_INSTANCE_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
+use std::sync::atomic::{AtomicUsize, Ordering};
+static GLOBAL_INSTANCE_COUNT: AtomicUsize = AtomicUsize::new(0);
 
 /// Type representing the return of a call to a libshout function.
 /// The Success value should never be returned as an error by this library.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum ShoutErr {
     /// No error
     Success = 0,
@@ -21,6 +21,7 @@ pub enum ShoutErr {
     Socket = -4,
     /// Out of memory
     Malloc = -5,
+    /// Error updating metadata on the server
     Metadata = -6,
     /// Cannot set parameter while connected
     Connected = -7,
@@ -36,6 +37,12 @@ pub enum ShoutErr {
     TLSBadCert = -12,
     /// Retry last operation
     Retry = -13,
+}
+
+impl From<i32> for ShoutErr {
+    fn from(i: i32) -> Self {
+        ShoutErr::new(i)
+    }
 }
 
 impl ShoutErr {
@@ -68,22 +75,43 @@ impl ShoutErr {
 }
 
 /// Type representing a TLS mode to connect to a host with
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum ShoutTLS {
     /// Do not use TLS at all
     Disabled = 0,
-    /// Autodetect which TLS mode to use if any
+    /// Autodetect which TLS mode to use if any.  Please note that this is not a
+    /// secure mode as it will *not* prevent any downgrade attacks.
+    /// `ShoutTLS::AutoNoPlain` is a more secure version of this mode.
     Auto = 1,
-    /// Like Auto, but does not allow plain connections
+    /// TLS (Transport Layer Security) is used. Autodetection is used to find
+    /// out about which modes are supported by the server. This mode should be
+    /// used for secure connections.
     AutoNoPlain = 2,
-    /// USE TLS for transport layer like HTTPS(RFC2818) does
+    /// TLS (Transport Layer Security) is used as defined by RFC2818. In this
+    /// mode libshout expects a TLS socket on the server side and will begin
+    /// with a TLS handshake prior to any other communication.
     RFC2818 = 11,
-    /// USE TLS via HTTP Upgrade:-header (RFC2817)
+    /// TLS (Transport Layer Security) is used as defined by RFC2817. In this
+    /// mode libshout will use HTTP/1.1's Upgrade:-process to switch to TLS.
+    /// This allows using TLS on a non-TLS socket of the server.
     RFC2817 = 12,
 }
 
+impl From<i32> for ShoutTLS {
+    fn from(i: i32) -> Self {
+        match i {
+            0 => ShoutTLS::Disabled,
+            1 => ShoutTLS::Auto,
+            2 => ShoutTLS::AutoNoPlain,
+            11 => ShoutTLS::RFC2818,
+            12 => ShoutTLS::RFC2817,
+            _ => unreachable!(),
+        }
+    }
+}
+
 /// Type representing the format of data to be streamed to the host is
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum ShoutFormat {
     /// application/ogg
     Ogg = 0,
@@ -91,17 +119,94 @@ pub enum ShoutFormat {
     MP3 = 1,
     /// video/webm
     Webm = 2,
-    /// audio/webm audio only
+    #[deprecated(
+        since = "0.2.2",
+        note = "Please use WebM with ShoutUsage::Audio"
+    )]
+    /// audio/webm audio only (use Webm with ShoutUsage::Audio)
     WebmAudio = 3,
+    Matroska = 4,
+}
+
+impl From<u32> for ShoutFormat {
+    fn from(i: u32) -> Self {
+        match i {
+            0 => ShoutFormat::Ogg,
+            1 => ShoutFormat::MP3,
+            2 => ShoutFormat::Webm,
+            #[allow(deprecated)]
+            3 => ShoutFormat::WebmAudio,
+            4 => ShoutFormat::Matroska,
+            _ => unimplemented!(),
+        }
+    }
+}
+
+/// Type representing intended usage of the stream.  Internally, the Rust
+/// library uses `Audio` without offering other `ShoutUsage`s to the native
+/// library.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum ShoutUsage {
+    /// Contains audio substreams
+    Audio = 0x0001,
+    /// Contains Picture/Video substreams, often combined with `ShoutUsage::Audio`
+    Visual = 0x0002,
+    /// Text substreams that are not subtitles
+    Text = 0x0004,
+    /// Subtitle substreams
+    Subtitle = 0x0008,
+    /// Light control substreams
+    Light = 0x0010,
+    /// User interface data, such as DVD menus or buttons
+    Ui = 0x0020,
+    /// Substreams that include metadata for the stream
+    Metadata = 0x0040,
+    /// Application specific data substreams
+    Application = 0x0080,
+    /// Substreams that control the infrastructure
+    Control = 0x0100,
+    /// Substreams that are themself a mixture of other types
+    Complex = 0x0200,
+    /// Substream of types not listed here
+    Other = 0x0400,
+    /// The stream *may* contain additional substreams of unknown nature
+    Unknown = 0x0800,
+    /// The Stream contains information for 3D playback
+    ThreeD = 0x1000,
+    /// The Stream contains information for 4D/XD playback
+    FourD = 0x2000,
 }
 
 /// Type representing the protocol to use for libshout
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum ShoutProtocol {
+    /// The HTTP protocol. This is the native protocol of the Icecast 2 server,
+    /// and is the default.
     HTTP = 0,
+    #[deprecated(
+        since = "0.2.2",
+        note = "Please use HTTP instead."
+    )]
+    /// The Audiocast format. This is the native protocol of Icecast 1.
     XAudioCast = 1,
+    /// The ShoutCast format. This is the native protocol of ShoutCast.
     Icy = 2,
+    /// The RoarAudio protocol. This is the native protocol for RoarAudio
+    /// servers.
     RoarAudio = 3,
+}
+
+impl From<u32> for ShoutProtocol {
+    fn from(i: u32) -> Self {
+        match i {
+            0 => ShoutProtocol::HTTP,
+            #[allow(deprecated)]
+            1 => ShoutProtocol::XAudioCast,
+            2 => ShoutProtocol::Icy,
+            3 => ShoutProtocol::RoarAudio,
+            _ => unimplemented!(),
+        }
+    }
 }
 
 pub static SHOUT_META_NAME: &'static str = "name";
@@ -113,7 +218,7 @@ pub static SHOUT_META_AIM: &'static str = "aim";
 pub static SHOUT_META_ICQ: &'static str = "icq";
 
 /// Type representing a meta value used in setting up the connection with the host.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ShoutMeta {
     Name(String),
     Url(String),
@@ -130,7 +235,7 @@ pub static SHOUT_AI_CHANNELS: &'static str = "channels";
 pub static SHOUT_AI_QUALITY: &'static str = "quality";
 
 /// Type representing information about the audio data to be sent to the host
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ShoutAudioInfo {
     BitRate(String),
     SampleRate(String),
@@ -140,7 +245,7 @@ pub enum ShoutAudioInfo {
 
 /// Type representing an error resulting from either libshout, or processing data to be sent to
 /// libshout
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum ShoutConnError {
     ShoutError(ShoutErr),
     NulError(NulError),
@@ -151,15 +256,16 @@ macro_rules! shout_conn_err {
         {
             let i = $func;
             if i != 0 {
-                return Err(ShoutConnError::ShoutError(ShoutErr::new(i)));
+                return Err(ShoutConnError::ShoutError(ShoutErr::from(i)));
             }
         }
     );
 }
 
-/// A shout connection builder. All desired values should be set in this before it is built into a
-/// `ShoutConn`. All validation of parameters and FFI calls happen on build.
-#[derive(Default)]
+/// A shout connection builder. All desired values should be set in this before
+/// it is built into a `ShoutConn`.  All validation of parameters and FFI calls
+/// happen on build.
+#[derive(Default, Eq, PartialEq)]
 pub struct ShoutConnBuilder {
     host: Option<String>,
     port: Option<u16>,
@@ -239,23 +345,8 @@ impl ShoutConnBuilder {
 
             shout_set_string!(agent, shout, sys::shout_set_agent);
 
-            match self.tls {
-                Some(ShoutTLS::Disabled) => {
-                    shout_conn_err!(sys::shout_set_tls(shout, 0));
-                }
-                Some(ShoutTLS::Auto) => {
-                    shout_conn_err!(sys::shout_set_tls(shout, 1));
-                }
-                Some(ShoutTLS::AutoNoPlain) => {
-                    shout_conn_err!(sys::shout_set_tls(shout, 2));
-                }
-                Some(ShoutTLS::RFC2818) => {
-                    shout_conn_err!(sys::shout_set_tls(shout, 11));
-                }
-                Some(ShoutTLS::RFC2817) => {
-                    shout_conn_err!(sys::shout_set_tls(shout, 12));
-                }
-                None => {}
+            if let Some(tls) = self.tls {
+                shout_conn_err!(sys::shout_set_tls(shout, tls as i32));
             }
 
             shout_set_string!(ca_directory, shout, sys::shout_set_ca_directory);
@@ -271,36 +362,17 @@ impl ShoutConnBuilder {
                 shout_conn_err!(sys::shout_set_public(shout, public));
             }
 
-            match self.format {
-                Some(ShoutFormat::Ogg) => {
-                    shout_conn_err!(sys::shout_set_format(shout, 0));
+            if let Some(format) = self.format {
+                #[allow(deprecated)]
+                if format == ShoutFormat::WebmAudio {
+                    shout_conn_err!(sys::shout_set_content_format(shout, ShoutFormat::Webm as u32, ShoutUsage::Audio as u32, std::ptr::null()));
+                } else {
+                    shout_conn_err!(sys::shout_set_content_format(shout, format as u32, ShoutUsage::Audio as u32, std::ptr::null()));
                 }
-                Some(ShoutFormat::MP3) => {
-                    shout_conn_err!(sys::shout_set_format(shout, 1));
-                }
-                Some(ShoutFormat::Webm) => {
-                    shout_conn_err!(sys::shout_set_format(shout, 2));
-                }
-                Some(ShoutFormat::WebmAudio) => {
-                    shout_conn_err!(sys::shout_set_format(shout, 3));
-                }
-                None => {}
             }
 
-            match self.protocol {
-                Some(ShoutProtocol::HTTP) => {
-                    shout_conn_err!(sys::shout_set_protocol(shout, 0));
-                }
-                Some(ShoutProtocol::XAudioCast) => {
-                    shout_conn_err!(sys::shout_set_protocol(shout, 1));
-                }
-                Some(ShoutProtocol::Icy) => {
-                    shout_conn_err!(sys::shout_set_protocol(shout, 2));
-                }
-                Some(ShoutProtocol::RoarAudio) => {
-                    shout_conn_err!(sys::shout_set_protocol(shout, 3));
-                }
-                None => {}
+            if let Some(protocol) = self.protocol {
+                shout_conn_err!(sys::shout_set_protocol(shout, protocol as u32));
             }
 
             if let Some(nonblocking) = self.nonblocking {
@@ -445,11 +517,18 @@ impl ShoutConn {
         }
     }
 
+    #[deprecated(
+        since = "0.2.2",
+        note = "This may be removed in future versions of libshout."
+    )]
     /// Sends unparsed data to the server. Do not use this unless you know what you're doing.
     /// Returns the number of bytes writter, or < 0 on error.
     pub fn send_raw(&self, data: &[u8]) -> Result<usize, ShoutErr> {
         let len = data.len();
-        let res = unsafe { sys::shout_send_raw(self.shout, data.as_ptr() as *const u8, len) };
+        let res = unsafe {
+            #[allow(deprecated)]
+            sys::shout_send_raw(self.shout, data.as_ptr() as *const u8, len)
+        };
         if res >= 0 {
             Ok(res as usize)
         } else {
